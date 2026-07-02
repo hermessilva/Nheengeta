@@ -18,6 +18,8 @@ import {
 export interface XKernelProcessOptions {
     DotnetPath: string;
     ExtraArgs: string[];
+    /** Extra/overridden environment variables for the kernel process. */
+    Env?: Record<string, string>;
     WorkingDirectory?: string;
     /** Called for every event, before per-command routing. */
     OnEvent?: (pEvent: XKernelEventEnvelope) => void;
@@ -54,6 +56,7 @@ export class XKernelProcess {
         const args = ["interactive", "stdio", ...this._Options.ExtraArgs];
         const proc = spawn(this._Options.DotnetPath, args, {
             cwd: this._Options.WorkingDirectory,
+            env: this._Options.Env ? { ...process.env, ...this._Options.Env } : process.env,
             stdio: ["pipe", "pipe", "pipe"],
             windowsHide: true
         });

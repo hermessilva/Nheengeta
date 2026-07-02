@@ -3,11 +3,20 @@
 // cell runs with no prior #!connect, this class works out the connection by
 // itself: detects LocalDB instances, detects (or pip-installs) Jupyter, and
 // returns the #!connect line the controller should submit.
+//
+// pip --user installs jupyter into a Scripts directory that is NOT on PATH
+// (e.g. %APPDATA%\Python\Python310\Scripts). PythonPathAdditions() exposes
+// those directories; the controller adds them to the kernel process PATH so
+// the jupyter connector finds the CLI without any user action.
 //------------------------------------------------------------------------------
 
 import { execFile } from "child_process";
+import * as path from "path";
 
 export class XAutoConnect {
+
+    private static _PythonCommand: string | null | undefined;
+    private static _PathAdditions: string[] | undefined;
 
     /** Note callback so progress lands in the cell output. */
     public static async ConnectCode(
@@ -20,6 +29,32 @@ export class XAutoConnect {
             case "r": return this.RConnectCode(pNote);
             default: return undefined; // kql needs cluster/database from the user
         }
+    }
+
+    /** Python Scripts dirs (user + venv) to prepend to the kernel PATH. */
+    public static async PythonPathAdditions(): Promise<string[]> {
+        if (this._PathAdditions)
+            return this._PathAdditions;
+        const python = await this.FindPython();
+        if (!python) {
+            this._PathAdditions = [];
+            return this._PathAdditions;
+        }
+        const script = "import sysconfig\n" +
+            "print(sysconfig.get_path('scripts', 'nt_user'))\n" +
+            "print(sysconfig.get_path('scripts'))";
+        const output = await this.Run(python, ["-c", script.replace(/\n/g, ";")], 20000);
+        this._PathAdditions = (output ?? "")
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter((l) => l.length > 0 && path.isAbsolute(l));
+        return this._PathAdditions;
+    }
+
+    /** PATH value with the python Scripts dirs prepended. */
+    public static async AugmentedPath(): Promise<string> {
+        const additions = await this.PythonPathAdditions();
+        return [...additions, process.env["PATH"] ?? ""].join(path.delimiter);
     }
 
     // ─── SQL: LocalDB auto-discovery ─────────────────────────────────────────
@@ -49,15 +84,17 @@ export class XAutoConnect {
         }
 
         await pNote(`🐍 Jupyter not found — installing automatically with ${python} -m pip (first time only, a few minutes)…`);
-        const install = await this.Run(python, ["-m", "pip", "install", "--user", "jupyter", "ipykernel"], 600000);
+        // ipykernel 7 changed the ZMQ handshake and hangs the dotnet-interactive
+        // jupyter connector — pin to the 6.x line, which connects fine.
+        const install = await this.Run(python, ["-m", "pip", "install", "--user", "jupyter", "ipykernel<7"], 600000);
         if (install === undefined) {
             await pNote("pip install failed — check your network and try again.");
             return undefined;
         }
         await pNote("✅ Jupyter installed.");
-        if (await this.HasKernelSpec("python") || await this.HasKernelSpec("python", python))
+        if (await this.HasKernelSpec("python"))
             return "#!connect jupyter --kernel-name python --kernel-spec python3";
-        await pNote("Jupyter installed but the python3 kernelspec is not visible yet — restart VS Code and run the cell again.");
+        await pNote("Jupyter installed but the python3 kernelspec is still not visible — restart VS Code and run the cell again.");
         return undefined;
     }
 
@@ -70,26 +107,33 @@ export class XAutoConnect {
 
     // ─── helpers ─────────────────────────────────────────────────────────────
 
-    private static async HasKernelSpec(pSpecPrefix: string, pPython?: string): Promise<boolean> {
-        const output = pPython
-            ? await this.Run(pPython, ["-m", "jupyter", "kernelspec", "list"], 30000)
-            : await this.Run("jupyter", ["kernelspec", "list"], 30000);
+    /** `jupyter kernelspec list` with the python Scripts dirs on PATH. */
+    private static async HasKernelSpec(pSpecPrefix: string): Promise<boolean> {
+        const output = await this.Run("jupyter", ["kernelspec", "list"], 30000, await this.AugmentedPath());
         return output !== undefined && new RegExp(`^\\s*${pSpecPrefix}`, "mi").test(output);
     }
 
     private static async FindPython(): Promise<string | undefined> {
+        if (this._PythonCommand !== undefined)
+            return this._PythonCommand ?? undefined;
         for (const candidate of ["py", "python", "python3"]) {
             const version = await this.Run(candidate, ["--version"], 15000);
-            if (version !== undefined && /Python 3/i.test(version))
+            if (version !== undefined && /Python 3/i.test(version)) {
+                this._PythonCommand = candidate;
                 return candidate;
+            }
         }
+        this._PythonCommand = null;
         return undefined;
     }
 
     /** Run a process; resolve stdout+stderr on exit 0, undefined otherwise. */
-    private static Run(pFile: string, pArgs: string[], pTimeoutMs: number): Promise<string | undefined> {
+    private static Run(pFile: string, pArgs: string[], pTimeoutMs: number, pPath?: string): Promise<string | undefined> {
         return new Promise((pResolve) => {
-            execFile(pFile, pArgs, { timeout: pTimeoutMs, windowsHide: true, shell: true }, (pErr, pStdout, pStderr) => {
+            const env = pPath ? { ...process.env, PATH: pPath, Path: pPath } : process.env;
+            // shell:true concatenates args — quote the ones cmd would mangle
+            const args = pArgs.map((a) => /[\s;()&^|<>"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a);
+            execFile(pFile, args, { timeout: pTimeoutMs, windowsHide: true, shell: true, env }, (pErr, pStdout, pStderr) => {
                 pResolve(pErr ? undefined : `${pStdout}\n${pStderr}`);
             });
         });

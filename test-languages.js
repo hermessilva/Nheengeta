@@ -5,6 +5,7 @@ const { spawnSync } = require("child_process");
 const { XKernelProcess } = require("./out/Core/KernelProcess");
 const { CreateCommand } = require("./out/Core/KernelProtocol");
 const { EvaluateMath } = require("./out/Math/MathEngine");
+const { XAutoConnect } = require("./out/Core/AutoConnect");
 
 const results = [];
 function report(name, ok, detail) {
@@ -27,7 +28,11 @@ async function submit(kernel, code, target, timeoutMs = 120000) {
 }
 
 async function main() {
-    const kernel = new XKernelProcess({ DotnetPath: "dotnet", ExtraArgs: [] });
+    const augmentedPath = await XAutoConnect.AugmentedPath();
+    const kernel = new XKernelProcess({
+        DotnetPath: "dotnet", ExtraArgs: [],
+        Env: { PATH: augmentedPath, Path: augmentedPath }
+    });
     await kernel.Start();
     console.log("kernel ready\n");
 
@@ -71,9 +76,12 @@ async function main() {
         }
     }
 
-    // ── Python (needs local jupyter kernelspec) ──
-    const spec = spawnSync("jupyter", ["kernelspec", "list"], { encoding: "utf8", shell: true, timeout: 30000 });
-    const hasPython = spec.status === 0 && /python3/.test(spec.stdout || "");
+    // ── Python (needs local jupyter kernelspec; PATH augmented like the controller) ──
+    const spec = spawnSync("jupyter", ["kernelspec", "list"], {
+        encoding: "utf8", shell: true, timeout: 30000,
+        env: { ...process.env, PATH: augmentedPath, Path: augmentedPath }
+    });
+    const hasPython = spec.status === 0 && /python3/.test((spec.stdout || "") + (spec.stderr || ""));
     if (!hasPython) {
         report("Python (jupyter)", "skip", "no python3 kernelspec on this machine");
         report("R (jupyter)", "skip", "no IR kernelspec on this machine");

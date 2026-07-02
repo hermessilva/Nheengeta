@@ -501,9 +501,12 @@ export class XNheengetaController {
 
         if (!this._Kernel) {
             const config = vscode.workspace.getConfiguration("nheengeta");
+            // python user Scripts dirs on PATH so #!connect jupyter finds the CLI
+            const augmentedPath = await XAutoConnect.AugmentedPath();
             this._Kernel = new XKernelProcess({
                 DotnetPath: XKernelInstaller.DotnetPath(),
                 ExtraArgs: config.get<string[]>("kernelArgs") ?? [],
+                Env: { PATH: augmentedPath, Path: augmentedPath },
                 WorkingDirectory: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
                 OnStderr: (pText) => this._Output.append(pText),
                 OnExit: (pCode) => {
