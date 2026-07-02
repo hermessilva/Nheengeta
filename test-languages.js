@@ -117,11 +117,16 @@ async function main() {
     report("HTML (local render)", true, "controller emits text/html directly");
     report("Mermaid (local render)", true, "controller emits text/vnd.mermaid to bundled renderer");
 
+    const strict = process.argv.includes("--strict");
     const failed = results.filter((x) => x.ok === false);
+    const skipped = results.filter((x) => x.ok === "skip");
     console.log(`\n${results.length} checks: ${results.filter((x) => x.ok === true).length} pass, ` +
-        `${results.filter((x) => x.ok === "skip").length} skip, ${failed.length} fail`);
-    console.log(failed.length === 0 ? "LANGUAGE SUITE PASSED" : "LANGUAGE SUITE FAILED");
-    process.exit(failed.length === 0 ? 0 : 1);
+        `${skipped.length} skip, ${failed.length} fail${strict ? " (strict: skips fail)" : ""}`);
+    if (skipped.length > 0 && !strict)
+        console.log(`NOT EXERCISED (external runtime missing): ${skipped.map((s) => s.name).join(", ")} — rerun with --strict to require them`);
+    const bad = failed.length + (strict ? skipped.length : 0);
+    console.log(bad === 0 ? "LANGUAGE SUITE PASSED" : "LANGUAGE SUITE FAILED");
+    process.exit(bad === 0 ? 0 : 1);
 }
 
 main().catch((e) => { console.error("FAILED:", e); process.exit(1); });
