@@ -114,7 +114,13 @@ function InstallPlot(pScope: Record<string, unknown>, pPlots: XPlotSpec[]): void
         const from = Number(options.from ?? -10);
         const to = Number(options.to ?? 10);
         const samples = Math.min(Math.max(Number(options.samples ?? DefaultSamples), 10), 5000);
-        const expressions = Array.isArray(pExpressions) ? pExpressions : [pExpressions];
+        // inside a math expression, ["a","b"] arrives as a mathjs Matrix
+        const collection = pExpressions as { toArray?: () => unknown[] };
+        const expressions = Array.isArray(pExpressions)
+            ? pExpressions
+            : (collection && typeof collection.toArray === "function")
+                ? collection.toArray()
+                : [pExpressions];
 
         const traces = expressions.map((pExpr): XPlotTrace => {
             const source = String(pExpr);
@@ -122,13 +128,14 @@ function InstallPlot(pScope: Record<string, unknown>, pPlots: XPlotSpec[]): void
             const xs: Array<number | null> = [];
             const ys: Array<number | null> = [];
             const step = (to - from) / (samples - 1);
+            // plain object (mathjs needs a normal prototype) sharing the
+            // persistent scope, so user-defined functions/variables resolve
+            const merged: Record<string, unknown> = { ...pScope };
             for (let i = 0; i < samples; i++) {
                 const x = from + i * step;
                 let y: number | null = null;
                 try {
-                    const local: Record<string, unknown> = { x };
-                    // expose the persistent scope (user functions/variables)
-                    const merged = Object.assign(Object.create(null), pScope, local) as Record<string, unknown>;
+                    merged["x"] = x;
                     const result = compiled.evaluate(merged) as unknown;
                     const value = typeof result === "number" ? result : Number(result);
                     y = Number.isFinite(value) ? value : null;
