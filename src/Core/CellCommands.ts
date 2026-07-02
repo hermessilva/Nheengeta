@@ -8,7 +8,10 @@ import * as vscode from "vscode";
 
 export class XCellCommands {
 
+    private static _ExtensionUri: vscode.Uri;
+
     public static Register(pContext: vscode.ExtensionContext): void {
+        this._ExtensionUri = pContext.extensionUri;
         pContext.subscriptions.push(
             vscode.commands.registerCommand("Nheengeta.CopyCellOutput", (pCell?: vscode.NotebookCell) => this.CopyOutput(pCell)),
             vscode.commands.registerCommand("Nheengeta.SelectCellLanguage", (pCell?: vscode.NotebookCell) => this.SelectLanguage(pCell)),
@@ -34,18 +37,20 @@ export class XCellCommands {
             return;
 
         interface XLanguagePick extends vscode.QuickPickItem { LanguageId?: string; Native?: boolean; }
+        const icon = (pName: string): vscode.Uri =>
+            vscode.Uri.joinPath(this._ExtensionUri, "media", "langs", `${pName}.svg`);
         // $(bug) marks languages with Debug Cell support.
         const picks: XLanguagePick[] = [
-            { label: "C#", description: "#!csharp", LanguageId: "csharp" },
-            { label: "F#", description: "#!fsharp", LanguageId: "fsharp" },
-            { label: "PowerShell $(bug)", description: "#!pwsh — debuggable", LanguageId: "powershell" },
-            { label: "JavaScript $(bug)", description: "#!javascript — debuggable", LanguageId: "javascript" },
-            { label: "Python $(bug)", description: "#!python — debuggable · needs #!connect jupyter", LanguageId: "python" },
-            { label: "R", description: "#!r — needs #!connect jupyter", LanguageId: "r" },
-            { label: "SQL", description: "#!sql — needs #!connect mssql", LanguageId: "sql" },
-            { label: "KQL", description: "#!kql — needs #!connect kusto", LanguageId: "kql" },
-            { label: "HTML", description: "#!html — rendered inline", LanguageId: "html" },
-            { label: "Mermaid", description: "#!mermaid — diagram", LanguageId: "mermaid" },
+            { label: "C#", description: "#!csharp", LanguageId: "csharp", iconPath: icon("csharp") },
+            { label: "F#", description: "#!fsharp", LanguageId: "fsharp", iconPath: icon("fsharp") },
+            { label: "PowerShell $(bug)", description: "#!pwsh — debuggable", LanguageId: "powershell", iconPath: icon("powershell") },
+            { label: "JavaScript $(bug)", description: "#!javascript — debuggable", LanguageId: "javascript", iconPath: icon("javascript") },
+            { label: "Python $(bug)", description: "#!python — debuggable · needs #!connect jupyter", LanguageId: "python", iconPath: icon("python") },
+            { label: "R", description: "#!r — needs #!connect jupyter", LanguageId: "r", iconPath: icon("r") },
+            { label: "SQL", description: "#!sql — needs #!connect mssql", LanguageId: "sql", iconPath: icon("sql") },
+            { label: "KQL", description: "#!kql — needs #!connect kusto", LanguageId: "kql", iconPath: icon("kql") },
+            { label: "HTML", description: "#!html — rendered inline", LanguageId: "html", iconPath: icon("html") },
+            { label: "Mermaid", description: "#!mermaid — diagram", LanguageId: "mermaid", iconPath: icon("mermaid") },
             { label: "", kind: vscode.QuickPickItemKind.Separator },
             { label: "$(list-selection) All languages…", description: "native language picker", Native: true }
         ];
