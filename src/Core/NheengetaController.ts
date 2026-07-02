@@ -33,6 +33,7 @@ const SupportedLanguages = ["csharp", "fsharp", "powershell", "javascript", "sql
 
 export const MermaidMimeType = "text/vnd.mermaid";
 export const PlotMimeType = "application/vnd.nheengeta.plot+json";
+export const MathMimeType = "application/vnd.nheengeta.math+json";
 
 /** Connector nuget packages loaded on demand when #!connect <name> is used. */
 const ConnectorPackages: Record<string, string> = {
@@ -101,9 +102,10 @@ export class XNheengetaController {
             this._MathScopes.set(key, scope);
         }
         const result = EvaluateMath(pCode, scope);
-        if (result.Results.length > 0) {
+        if (result.Lines.length > 0) {
             await pExecution.appendOutput(new vscode.NotebookCellOutput([
-                vscode.NotebookCellOutputItem.text(result.Results.join("\n"), "text/plain")
+                vscode.NotebookCellOutputItem.json({ Lines: result.Lines }, MathMimeType),
+                vscode.NotebookCellOutputItem.text(result.Lines.map((l) => l.Text).join("\n"), "text/plain")
             ]));
         }
         for (const plot of result.Plots) {

@@ -2,7 +2,7 @@
     "name": "nheengeta",
     "displayName": "Nheengetá Notebooks",
     "description": "Polyglot notebooks powered by the .NET Interactive kernel — C#, F#, T-SQL, KQL, PowerShell, JavaScript, Python, R, HTML and Mermaid, all speaking together.",
-    "version": "0.1.11",
+    "version": "0.1.12",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -78,6 +78,14 @@
                 "entrypoint": "./out/Renderer/PlotRenderer.js",
                 "mimeTypes": [
                     "application/vnd.nheengeta.plot+json"
+                ]
+            },
+            {
+                "id": "nheengeta-math",
+                "displayName": "Nheengetá Math (KaTeX)",
+                "entrypoint": "./out/Renderer/MathRenderer.js",
+                "mimeTypes": [
+                    "application/vnd.nheengeta.math+json"
                 ]
             }
         ],
@@ -271,10 +279,12 @@
         }
     },
     "scripts": {
-        "compile": "tsc -p ./ && npm run compile-renderer && npm run compile-plot && npm run compile-math",
+        "compile": "tsc -p ./ && npm run compile-renderer && npm run compile-plot && npm run compile-math && npm run compile-katex-css && npm run compile-math-renderer",
         "compile-renderer": "esbuild src/Renderer/MermaidRenderer.ts --bundle --format=esm --minify --outfile=out/Renderer/MermaidRenderer.js",
         "compile-plot": "esbuild src/Renderer/PlotRenderer.ts --bundle --format=esm --minify --outfile=out/Renderer/PlotRenderer.js",
         "compile-math": "esbuild src/Math/MathEngine.ts --bundle --format=cjs --platform=node --minify --outfile=out/Math/MathEngine.js",
+        "compile-katex-css": "esbuild node_modules/katex/dist/katex.min.css --bundle --loader:.woff2=dataurl --loader:.woff=empty --loader:.ttf=empty --outfile=src/Renderer/generated/katex-inline.css",
+        "compile-math-renderer": "esbuild src/Renderer/MathRenderer.ts --bundle --format=esm --minify --loader:.css=text --outfile=out/Renderer/MathRenderer.js",
         "watch": "tsc -watch -p ./",
         "package": "vsce package",
         "pack-lib": "npm pack"
@@ -290,9 +300,10 @@
         "@types/vscode": "^1.99.0",
         "@types/vscode-notebook-renderer": "^1.72.0",
         "esbuild": "^0.21.0",
-        "function-plot": "^1.25.0",
+        "katex": "^0.16.0",
         "mathjs": "^13.0.0",
         "mermaid": "^10.9.0",
+        "plotly.js-dist-min": "^2.33.0",
         "typescript": "^5.3.0"
     }
 }

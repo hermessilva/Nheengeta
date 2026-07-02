@@ -1,22 +1,40 @@
 //------------------------------------------------------------------------------
 // MathEngine — evaluates #!math cells with mathjs (symbolic-lite CAS: algebra,
-// derivatives, matrices, complex numbers, units, bignumbers) and samples
-// expressions into plot specs consumed by the PlotRenderer.
+// derivatives, matrices, complex numbers, units, bignumbers).
+// Each visible statement yields a line with plain text AND LaTeX (typeset by
+// the KaTeX MathRenderer). plot() samples expressions into Plotly specs.
 // Bundled by esbuild into out/Math/MathEngine.js (mathjs inlined).
 //------------------------------------------------------------------------------
 
-import { create, all } from "mathjs";
+import { create, all, MathNode } from "mathjs";
 
 const _Math = create(all);
-const DefaultSamples = 300;
+const DefaultSamples = 400;
+
+export interface XMathLine {
+    Text: string;
+    Latex?: string;
+}
+
+export interface XPlotTrace {
+    x: Array<number | null>;
+    y: Array<number | null>;
+    name: string;
+}
 
 export interface XPlotSpec {
-    data: Array<Record<string, unknown>>;
-    options: Record<string, unknown>;
+    traces: XPlotTrace[];
+    layout: {
+        title?: string;
+        xRange?: [number, number];
+        yRange?: [number, number];
+        width?: number;
+        height?: number;
+    };
 }
 
 export interface XMathOutput {
-    Results: string[];
+    Lines: XMathLine[];
     Plots: XPlotSpec[];
     Error?: string;
 }
@@ -29,7 +47,6 @@ interface XPlotOptions {
     yDomain?: [number, number];
     width?: number;
     height?: number;
-    grid?: boolean;
 }
 
 /**
@@ -37,77 +54,133 @@ interface XPlotOptions {
  * so variables and functions defined earlier stay available.
  */
 export function EvaluateMath(pCode: string, pScope: Record<string, unknown>): XMathOutput {
-    const results: string[] = [];
+    const lines: XMathLine[] = [];
     const plots: XPlotSpec[] = [];
+    InstallPlot(pScope, plots);
 
+    let root: MathNode;
+    try {
+        root = _Math.parse(pCode);
+    }
+    catch (err) {
+        return { Lines: lines, Plots: plots, Error: err instanceof Error ? err.message : String(err) };
+    }
+
+    const statements = root.type === "BlockNode"
+        ? (root as unknown as { blocks: Array<{ node: MathNode; visible: boolean }> }).blocks
+        : [{ node: root, visible: true }];
+
+    try {
+        for (const statement of statements) {
+            const value = statement.node.compile().evaluate(pScope) as unknown;
+            if (!statement.visible)
+                continue;
+
+            if (statement.node.type === "FunctionAssignmentNode") {
+                lines.push({ Text: statement.node.toString(), Latex: SafeTex(statement.node) });
+                continue;
+            }
+            if (value === undefined || typeof value === "function")
+                continue;
+
+            const text = typeof value === "string" ? value : _Math.format(value, { precision: 14 });
+            const isAssignment = statement.node.type === "AssignmentNode";
+            const lhs = isAssignment ? SafeTex(statement.node) : SafeTex(statement.node);
+            const rhs = typeof value === "string" ? undefined : ValueTex(value);
+
+            let latex: string | undefined;
+            if (isAssignment)
+                latex = lhs; // assignment tex already contains ":="-style equality
+            else if (lhs && rhs)
+                latex = `${lhs} \\;=\\; ${rhs}`;
+            else
+                latex = rhs ?? lhs;
+
+            lines.push({ Text: text, Latex: latex });
+        }
+        return { Lines: lines, Plots: plots };
+    }
+    catch (err) {
+        return { Lines: lines, Plots: plots, Error: err instanceof Error ? err.message : String(err) };
+    }
+}
+
+// ─── plot() ──────────────────────────────────────────────────────────────────
+
+function InstallPlot(pScope: Record<string, unknown>, pPlots: XPlotSpec[]): void {
     // plot("sin(x)") · plot(["sin(x)","cos(x)"], { from:-pi, to:pi, title:"..." })
-    (pScope as Record<string, unknown>).plot = (pExpressions: unknown, pOptions?: XPlotOptions): string => {
+    pScope["plot"] = (pExpressions: unknown, pOptions?: XPlotOptions): undefined => {
         const options = pOptions ?? {};
         const from = Number(options.from ?? -10);
         const to = Number(options.to ?? 10);
         const samples = Math.min(Math.max(Number(options.samples ?? DefaultSamples), 10), 5000);
         const expressions = Array.isArray(pExpressions) ? pExpressions : [pExpressions];
 
-        const data = expressions.map((pExpr) => {
+        const traces = expressions.map((pExpr): XPlotTrace => {
             const source = String(pExpr);
             const compiled = _Math.compile(source);
-            const points: Array<[number, number]> = [];
+            const xs: Array<number | null> = [];
+            const ys: Array<number | null> = [];
             const step = (to - from) / (samples - 1);
-            const local = Object.create(pScope) as Record<string, unknown>;
             for (let i = 0; i < samples; i++) {
                 const x = from + i * step;
-                local["x"] = x;
+                let y: number | null = null;
                 try {
-                    const y = compiled.evaluate(local) as unknown;
-                    const value = typeof y === "number" ? y : Number(y);
-                    if (Number.isFinite(value))
-                        points.push([x, value]);
+                    const local: Record<string, unknown> = { x };
+                    // expose the persistent scope (user functions/variables)
+                    const merged = Object.assign(Object.create(null), pScope, local) as Record<string, unknown>;
+                    const result = compiled.evaluate(merged) as unknown;
+                    const value = typeof result === "number" ? result : Number(result);
+                    y = Number.isFinite(value) ? value : null;
                 }
                 catch {
-                    // singularities/domain errors: skip the sample
+                    y = null; // singularity/domain error -> gap in the curve
                 }
+                xs.push(x);
+                ys.push(y);
             }
-            return { points, fnType: "points", graphType: "polyline", label: source };
+            return { x: xs, y: ys, name: source };
         });
 
-        plots.push({
-            data,
-            options: {
+        pPlots.push({
+            traces,
+            layout: {
                 title: options.title,
-                xDomain: [from, to],
-                yDomain: options.yDomain,
+                xRange: [from, to],
+                yRange: options.yDomain,
                 width: options.width,
-                height: options.height,
-                grid: options.grid
+                height: options.height
             }
         });
-        return `plot: ${expressions.map(String).join(", ")}`;
+        return undefined;
     };
+}
 
+// ─── LaTeX helpers ───────────────────────────────────────────────────────────
+
+function SafeTex(pNode: MathNode): string | undefined {
     try {
-        const outcome = _Math.evaluate(pCode, pScope) as unknown;
-        Collect(outcome, results);
-        return { Results: results, Plots: plots };
+        return pNode.toTex({ parenthesis: "auto" });
     }
-    catch (err) {
-        return { Results: results, Plots: plots, Error: err instanceof Error ? err.message : String(err) };
+    catch {
+        return undefined;
     }
 }
 
-function Collect(pValue: unknown, pResults: string[]): void {
-    if (pValue === undefined)
-        return;
-    const typed = pValue as { type?: string; entries?: unknown[] };
-    if (typed && typed.type === "ResultSet" && Array.isArray(typed.entries)) {
-        for (const entry of typed.entries)
-            Collect(entry, pResults);
-        return;
+function ValueTex(pValue: unknown): string | undefined {
+    const node = pValue as { isNode?: boolean; toTex?: (pOptions?: unknown) => string };
+    if (node && node.isNode && typeof node.toTex === "function") {
+        try {
+            return node.toTex({ parenthesis: "auto" });
+        }
+        catch {
+            return undefined;
+        }
     }
-    if (typeof pValue === "string") {
-        pResults.push(pValue);
-        return;
+    try {
+        return _Math.parse(_Math.format(pValue, { precision: 14 })).toTex({ parenthesis: "auto" });
     }
-    if (typeof pValue === "function")
-        return; // function definitions produce no output
-    pResults.push(_Math.format(pValue, { precision: 14 }));
+    catch {
+        return undefined;
+    }
 }
