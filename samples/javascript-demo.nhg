@@ -1,0 +1,63 @@
+#!markdown
+
+# JavaScript — Node na célula
+
+Roda no Node local (mesmo runtime da 🐞). `console.table`, `crypto`, `fetch` —
+tudo disponível. Pacotes npm com `#!use`.
+
+#!javascript
+
+// transformação de dados + console.table
+const logs = [
+    { route: "/api/users",  ms: 42,  status: 200 },
+    { route: "/api/users",  ms: 480, status: 200 },
+    { route: "/api/orders", ms: 95,  status: 500 },
+    { route: "/api/orders", ms: 62,  status: 200 },
+    { route: "/api/login",  ms: 210, status: 401 },
+    { route: "/api/users",  ms: 38,  status: 200 }
+];
+
+const byRoute = Object.values(logs.reduce((acc, l) => {
+    const r = acc[l.route] ??= { route: l.route, calls: 0, avgMs: 0, errors: 0 };
+    r.avgMs = (r.avgMs * r.calls + l.ms) / (r.calls + 1);
+    r.calls++;
+    if (l.status >= 400) r.errors++;
+    return acc;
+}, {}));
+
+console.table(byRoute.map(r => ({ ...r, avgMs: Math.round(r.avgMs) })));
+
+#!javascript
+
+// crypto nativo: hash e UUID
+const { createHash, randomUUID } = require("crypto");
+
+console.log("uuid  :", randomUUID());
+console.log("sha256:", createHash("sha256").update("Nheengetá").digest("hex").slice(0, 32) + "…");
+
+#!javascript
+
+#!use lodash
+
+// pacote npm instalado pelo #!use (cache da extensão)
+const _ = require("lodash");
+
+const people = [
+    { name: "Ana",   team: "Data" },
+    { name: "Bruno", team: "Web"  },
+    { name: "Caio",  team: "Data" },
+    { name: "Duda",  team: "Web"  }
+];
+console.log(_.groupBy(people, "team"));
+
+#!javascript
+
+// fetch nativo (Node 18+) — precisa de rede
+const res = await fetch("https://api.github.com/repos/hermessilva/Nheengeta");
+if (res.ok) {
+    const repo = await res.json();
+    console.log(`${repo.full_name}: ★ ${repo.stargazers_count} — ${repo.description ?? ""}`);
+}
+else {
+    console.log("offline ou rate-limited — tudo bem, o resto do notebook não depende disto");
+}

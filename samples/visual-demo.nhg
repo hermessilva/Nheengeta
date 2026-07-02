@@ -1,0 +1,49 @@
+#!markdown
+
+# HTML + Mermaid — documentação viva
+
+Células visuais renderizam **offline e na hora** — sem kernel.
+
+#!html
+
+<div style="font-family: sans-serif; border: 1px solid #4caf6e; border-radius: 8px; overflow: hidden; max-width: 460px">
+  <div style="background: #1f3129; color: #7ed491; padding: 10px 14px; font-weight: 600">
+    Status do release — Nheengetá 0.1.x
+  </div>
+  <div style="padding: 12px 14px; line-height: 1.7">
+    <b>12 línguas</b> ativas · kernel .NET Interactive<br/>
+    Debug de célula: <span style="color:#E5533C">●</span> JS
+    <span style="color:#E5533C">●</span> Python
+    <span style="color:#E5533C">●</span> PowerShell<br/>
+    Math: KaTeX + Plotly · Deps: <code>#!use</code>
+  </div>
+</div>
+
+#!mermaid
+
+flowchart LR
+    subgraph Notebook [.nhg]
+        C1[célula C#] --> K
+        C2[célula SQL] --> K
+        C3[célula math] --> M
+    end
+    K[dotnet-interactive kernel] --> DB[(LocalDB)]
+    M[mathjs engine] --> P[Plotly / KaTeX]
+
+#!mermaid
+
+sequenceDiagram
+    participant U as Você
+    participant N as Nheengetá
+    participant K as Kernel
+    U->>N: Shift+Enter
+    N->>K: SubmitCode (stdio)
+    K-->>N: ReturnValueProduced
+    N-->>U: output renderizado
+
+#!mermaid
+
+pie title Onde o tempo vai
+    "Pensando" : 45
+    "Testando na célula" : 40
+    "Confirmando" : 15

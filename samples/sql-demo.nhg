@@ -1,0 +1,47 @@
+#!markdown
+
+# T-SQL — banco de verdade na célula
+
+`#!connect mssql` uma vez (o conector baixa sozinho do nuget na primeira vez).
+Ajuste a connection string — o exemplo usa **LocalDB**.
+
+#!csharp
+
+#!connect mssql --kernel-name lab "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"
+
+#!sql
+
+-- panorama do servidor
+SELECT @@SERVERNAME AS servidor, @@VERSION AS versao;
+
+#!sql
+
+-- bancos com tamanho e estado
+SELECT d.name,
+       d.state_desc,
+       CAST(SUM(mf.size) * 8.0 / 1024 AS DECIMAL(10,1)) AS size_mb,
+       d.recovery_model_desc
+FROM sys.databases d
+JOIN sys.master_files mf ON mf.database_id = d.database_id
+GROUP BY d.name, d.state_desc, d.recovery_model_desc
+ORDER BY size_mb DESC;
+
+#!sql
+
+-- playground: tabela temporária, insert, agregação — sem sujar nada
+CREATE TABLE #vendas (regiao NVARCHAR(20), produto NVARCHAR(30), qtd INT, preco DECIMAL(9,2));
+
+INSERT INTO #vendas VALUES
+ (N'Sul',   N'Café',   120, 24.90),
+ (N'Norte', N'Café',   200, 24.90),
+ (N'Leste', N'Filtro', 150,  8.50),
+ (N'Leste', N'Caneca',  60, 39.00);
+
+SELECT regiao,
+       SUM(qtd)           AS itens,
+       SUM(qtd * preco)   AS receita
+FROM #vendas
+GROUP BY regiao
+ORDER BY receita DESC;
+
+DROP TABLE #vendas;

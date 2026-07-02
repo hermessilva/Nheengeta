@@ -1,0 +1,41 @@
+#!markdown
+
+# F# — pipelines e modelagem funcional
+
+#!fsharp
+
+// pipeline: primos até 100 por crivo simples
+let primes limit =
+    let isPrime n =
+        n > 1 && (seq { 2 .. int (sqrt (float n)) } |> Seq.forall (fun d -> n % d <> 0))
+    seq { 2 .. limit } |> Seq.filter isPrime |> List.ofSeq
+
+primes 100
+
+#!fsharp
+
+// records + pattern matching: máquina de estados de um pedido
+type Order = { Id: int; Status: string; Total: decimal }
+
+let advance order =
+    match order.Status with
+    | "created"  -> { order with Status = "paid" }
+    | "paid"     -> { order with Status = "shipped" }
+    | "shipped"  -> { order with Status = "delivered" }
+    | s          -> { order with Status = s }
+
+{ Id = 42; Status = "created"; Total = 199.90m }
+|> advance |> advance |> advance
+
+#!fsharp
+
+// fold com estatística descritiva
+let samples = [ 12.4; 15.1; 9.8; 22.0; 17.3; 14.9; 11.2; 19.6 ]
+
+let stats =
+    let n = float (List.length samples)
+    let mean = List.sum samples / n
+    let variance = samples |> List.sumBy (fun x -> (x - mean) ** 2.0) |> fun s -> s / n
+    {| Count = int n; Mean = mean; StdDev = sqrt variance; Min = List.min samples; Max = List.max samples |}
+
+stats

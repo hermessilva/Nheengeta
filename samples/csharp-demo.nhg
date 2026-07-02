@@ -1,0 +1,76 @@
+#!markdown
+
+# C# — análise de dados com LINQ
+
+Coleções retornadas viram **tabelas HTML** automaticamente. Variáveis persistem
+entre células C# e podem ser compartilhadas com outras línguas via `#!set`.
+
+#!csharp
+
+// modelo + massa de dados
+record Sale(string Region, string Product, int Quantity, decimal UnitPrice)
+{
+    public decimal Total => Quantity * UnitPrice;
+}
+
+var sales = new[]
+{
+    new Sale("Sul",   "Café",   120, 24.90m),
+    new Sale("Sul",   "Filtro",  80,  8.50m),
+    new Sale("Norte", "Café",   200, 24.90m),
+    new Sale("Norte", "Caneca",  35, 39.00m),
+    new Sale("Leste", "Café",    90, 24.90m),
+    new Sale("Leste", "Filtro", 150,  8.50m),
+    new Sale("Leste", "Caneca",  60, 39.00m)
+};
+
+sales
+
+#!csharp
+
+// pipeline LINQ: receita por região, ordenada
+var byRegion = sales
+    .GroupBy(s => s.Region)
+    .Select(g => new
+    {
+        Region = g.Key,
+        Items = g.Sum(s => s.Quantity),
+        Revenue = g.Sum(s => s.Total),
+        TopProduct = g.OrderByDescending(s => s.Total).First().Product
+    })
+    .OrderByDescending(r => r.Revenue)
+    .ToList();
+
+byRegion
+
+#!csharp
+
+// agregado global — fica disponível para as próximas células
+var totalRevenue = sales.Sum(s => s.Total);
+Console.WriteLine($"Receita total: R$ {totalRevenue:N2}");
+
+#!markdown
+
+## NuGet em uma linha
+
+`#!use` (ou o botão 📦) traduz para `#r "nuget:..."`:
+
+#!csharp
+
+#!use Humanizer
+
+using Humanizer;
+
+TimeSpan.FromDays(1234).Humanize(3).Dump();
+DateTime.UtcNow.AddDays(-3).Humanize()
+
+#!markdown
+
+## Compartilhando com F#
+
+`#!set` puxa valores de outro kernel:
+
+#!fsharp
+
+#!set --name totalRevenue --value @csharp:totalRevenue
+printfn $"F# enxerga a receita do C#: R$ %.2f{float totalRevenue}"
