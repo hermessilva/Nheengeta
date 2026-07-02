@@ -81,6 +81,17 @@ export class XNheengetaController {
         this._Controller.executeHandler = (pCells, _pNotebook, _pController) => this.ExecuteCells(pCells);
 
         _Context.subscriptions.push(this._Controller, this._Output, { dispose: () => this._Kernel?.Dispose() });
+
+        // Preferred affinity auto-selects this controller when a .nhg opens.
+        // Without a selected controller the cell toolbar renders only a
+        // minimal action set until the first execution.
+        const preferController = (pNotebook: vscode.NotebookDocument): void => {
+            if (pNotebook.notebookType === NotebookType)
+                this._Controller.updateNotebookAffinity(pNotebook, vscode.NotebookControllerAffinity.Preferred);
+        };
+        for (const notebook of vscode.workspace.notebookDocuments)
+            preferController(notebook);
+        _Context.subscriptions.push(vscode.workspace.onDidOpenNotebookDocument(preferController));
     }
 
     public async RestartKernel(): Promise<void> {
