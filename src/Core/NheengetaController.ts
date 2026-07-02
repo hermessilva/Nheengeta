@@ -97,6 +97,7 @@ export class XNheengetaController {
     public async RestartKernel(): Promise<void> {
         if (this._Kernel) {
             this._LoadedConnectors.clear();
+            this._ConnectedKernels.clear();
             await this._Kernel.Restart();
             void vscode.window.showInformationMessage("Nheengetá: kernel restarted.");
         }
@@ -188,6 +189,9 @@ export class XNheengetaController {
     // ─── connector preload ───────────────────────────────────────────────────
 
     private readonly _LoadedConnectors = new Set<string>();
+
+    /** "sql" -> "sql-<name>", "kql" -> "kql-<name>" from #!connect cells. */
+    private readonly _ConnectedKernels = new Map<string, string>();
 
     /** Load the nuget connector package(s) referenced by a #!connect cell. */
     private async EnsureConnectors(
@@ -300,6 +304,21 @@ export class XNheengetaController {
                 targetKernel = ".NET";
                 await this.EnsureConnectors(kernel, code, execution);
             }
+            else if (languageId === "sql" || languageId === "kql") {
+                // connected kernels are registered as sql-<name> / kql-<name>
+                const connected = this._ConnectedKernels.get(languageId);
+                if (!connected) {
+                    await execution.appendOutput(new vscode.NotebookCellOutput([
+                        vscode.NotebookCellOutputItem.error(CleanError(
+                            languageId === "sql"
+                                ? 'No SQL connection yet. Run a cell with:\n#!connect mssql --kernel-name lab "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"'
+                                : 'No Kusto connection yet. Run a cell with:\n#!connect kusto --kernel-name mycluster --cluster "https://..." --database mydb'))
+                    ]));
+                    execution.end(false, Date.now());
+                    return;
+                }
+                targetKernel = connected;
+            }
 
             const envelope = CreateSubmitCode(code, targetKernel);
             const result = await kernel.Execute(envelope, (pEvent) => {
@@ -313,6 +332,13 @@ export class XNheengetaController {
             }
             if (result.Succeeded && targetKernel && targetKernel !== ".NET")
                 this._KernelsUsed.add(targetKernel);
+            if (result.Succeeded && targetKernel === ".NET") {
+                // remember connections so sql/kql cells route to them
+                for (const match of code.matchAll(/#!connect\s+(mssql|kusto)\s+[^\n]*?--kernel-name\s+(\S+)/g)) {
+                    const prefix = match[1] === "mssql" ? "sql" : "kql";
+                    this._ConnectedKernels.set(prefix, `${prefix}-${match[2]}`);
+                }
+            }
             execution.end(result.Succeeded, Date.now());
             this._OnDidExecute.fire();
         }
@@ -440,6 +466,7 @@ export class XNheengetaController {
                 OnStderr: (pText) => this._Output.append(pText),
                 OnExit: (pCode) => {
                     this._LoadedConnectors.clear();
+                    this._ConnectedKernels.clear();
                     this._Output.appendLine(`[kernel exited: ${pCode}]`);
                 }
             });
