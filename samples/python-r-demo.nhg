@@ -1,0 +1,48 @@
+#!markdown
+
+# Python e R — via Jupyter local
+
+Requisito: `pip install jupyter` (Python) e, para R, o kernel IRkernel.
+Conecte uma vez por sessão:
+
+#!csharp
+
+#!connect jupyter --kernel-name python --kernel-spec python3
+
+#!python
+
+# análise com a biblioteca padrão — sem pip install
+import statistics as st
+from collections import Counter
+
+tempos_ms = [42, 480, 95, 62, 210, 38, 71, 55, 302, 48]
+
+print(f"n={len(tempos_ms)}  média={st.mean(tempos_ms):.1f}ms  "
+      f"mediana={st.median(tempos_ms):.1f}ms  p-desvio={st.pstdev(tempos_ms):.1f}ms")
+
+palavras = "o notebook fala muitas linguas e o notebook escuta todas".split()
+print(Counter(palavras).most_common(3))
+
+#!python
+
+#!use requests
+
+# pacote via #!use (pip) — precisa de rede
+import requests
+r = requests.get("https://api.github.com/zen", timeout=5)
+print("GitHub zen:", r.text if r.ok else r.status_code)
+
+#!markdown
+
+## R (requer IRkernel instalado)
+
+```
+#!connect jupyter --kernel-name r --kernel-spec ir
+```
+
+#!r
+
+# estatística nativa do R
+x <- c(12.4, 15.1, 9.8, 22.0, 17.3, 14.9, 11.2, 19.6)
+summary(x)
+cat("desvio padrão:", sd(x), "\n")
