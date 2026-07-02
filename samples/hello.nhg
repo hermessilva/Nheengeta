@@ -40,13 +40,13 @@ flowchart LR
 
 ## SQL — connect once, then query
 
-The first `#!connect mssql` in a session downloads the connector from nuget
-automatically (needs network once; cached after). Point it at any SQL Server —
-e.g. a LocalDB instance:
+On Windows with LocalDB you can skip this cell entirely — a SQL cell with no
+connection **auto-connects** to your default LocalDB instance. The explicit
+`#!connect` below is for pointing at any other SQL Server:
 
 #!csharp
 
-#!connect mssql --kernel-name mydb "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"
+#!connect mssql --kernel-name mydb "Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"
 
 #!sql
 

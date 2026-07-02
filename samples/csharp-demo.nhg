@@ -61,7 +61,7 @@ Console.WriteLine($"Receita total: R$ {totalRevenue:N2}");
 
 using Humanizer;
 
-TimeSpan.FromDays(1234).Humanize(3).Dump();
+Console.WriteLine(TimeSpan.FromDays(1234).Humanize(3));
 DateTime.UtcNow.AddDays(-3).Humanize()
 
 #!markdown
