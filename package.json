@@ -2,7 +2,7 @@
     "name": "nheengeta",
     "displayName": "Nheengetá Notebooks",
     "description": "Polyglot notebooks powered by the .NET Interactive kernel — C#, F#, T-SQL, KQL, PowerShell, JavaScript, Python, R, HTML and Mermaid, all speaking together.",
-    "version": "0.1.8",
+    "version": "0.1.9",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -48,6 +48,7 @@
                 "nheengeta": "left"
             },
             "notebook.lineNumbers": "on",
+            "notebook.showCellStatusBar": "hidden",
             "debug.allowBreakpointsEverywhere": true,
             "debug.inlineValues": "on"
         },
