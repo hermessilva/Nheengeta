@@ -7,7 +7,7 @@ Ajuste a connection string — o exemplo usa **LocalDB**.
 
 #!csharp
 
-#!connect mssql --kernel-name lab "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"
+#!connect mssql --kernel-name lab "Server=(localdb)\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"
 
 #!sql
 
