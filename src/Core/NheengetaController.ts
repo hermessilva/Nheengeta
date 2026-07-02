@@ -10,6 +10,7 @@ import { spawn } from "child_process";
 import { XKernelProcess } from "./KernelProcess";
 import { XKernelInstaller } from "./KernelInstaller";
 import { XSubkernelRegistry } from "./SubkernelRegistry";
+import { XAutoConnect } from "./AutoConnect";
 import { KernelNameForLanguage } from "./NheengetaSerializer";
 import {
     CreateCommand,
@@ -193,6 +194,47 @@ export class XNheengetaController {
     /** "sql" -> "sql-<name>", "kql" -> "kql-<name>" from #!connect cells. */
     private readonly _ConnectedKernels = new Map<string, string>();
 
+    /** Zero-setup path: figure the connection out (LocalDB, Jupyter/pip),
+     *  submit the #!connect and register it. Returns the kernel name. */
+    private async TryAutoConnect(
+        pLanguageId: string,
+        pKernel: XKernelProcess,
+        pExecution: vscode.NotebookCellExecution
+    ): Promise<string | undefined> {
+        const note = async (pText: string): Promise<void> => {
+            await pExecution.appendOutput(new vscode.NotebookCellOutput([
+                vscode.NotebookCellOutputItem.text(pText, "text/plain")
+            ]));
+        };
+        const connectCode = await XAutoConnect.ConnectCode(pLanguageId, note);
+        if (!connectCode)
+            return undefined;
+
+        await this.EnsureConnectors(pKernel, connectCode, pExecution);
+        const result = await pKernel.Execute(CreateSubmitCode(connectCode, ".NET"), () => { /* quiet */ });
+        if (!result.Succeeded) {
+            await note(`Auto-connect failed: ${(result.Error ?? "").split("\n")[0]}`);
+            return undefined;
+        }
+        this.RegisterConnections(connectCode);
+        await note("✅ Connected.");
+        return this._ConnectedKernels.get(pLanguageId);
+    }
+
+    /** Remember kernels created by #!connect so cells route to them. */
+    private RegisterConnections(pCode: string): void {
+        for (const match of pCode.matchAll(/#!connect\s+(mssql|kusto)\s+[^\n]*?--kernel-name\s+(\S+)/g)) {
+            const prefix = match[1] === "mssql" ? "sql" : "kql";
+            this._ConnectedKernels.set(prefix, `${prefix}-${match[2]}`);
+        }
+        for (const match of pCode.matchAll(/#!connect\s+jupyter\s+[^\n]*?--kernel-name\s+(\S+)[^\n]*?--kernel-spec\s+(\S+)/g)) {
+            // jupyter kernels keep the given name; language inferred from the spec
+            const language = /^python/i.test(match[2]) ? "python" : /^(ir|r)\b/i.test(match[2]) ? "r" : undefined;
+            if (language)
+                this._ConnectedKernels.set(language, match[1]);
+        }
+    }
+
     /** Load the nuget connector package(s) referenced by a #!connect cell. */
     private async EnsureConnectors(
         pKernel: XKernelProcess,
@@ -306,7 +348,9 @@ export class XNheengetaController {
             }
             else if (languageId === "sql" || languageId === "kql" || languageId === "python" || languageId === "r") {
                 // these languages need a #!connect first; route to the kernel it created
-                const connected = this._ConnectedKernels.get(languageId);
+                let connected = this._ConnectedKernels.get(languageId);
+                if (!connected)
+                    connected = await this.TryAutoConnect(languageId, kernel, execution);
                 if (!connected) {
                     const hints: Record<string, string> = {
                         sql: 'No SQL connection yet. Run a cell with:\n#!connect mssql --kernel-name lab "Server=(localdb)\\MSSQLLocalDB;Integrated Security=true;TrustServerCertificate=true"',
@@ -335,19 +379,8 @@ export class XNheengetaController {
             }
             if (result.Succeeded && targetKernel && targetKernel !== ".NET")
                 this._KernelsUsed.add(targetKernel);
-            if (result.Succeeded && targetKernel === ".NET") {
-                // remember connections so sql/kql/python/r cells route to them
-                for (const match of code.matchAll(/#!connect\s+(mssql|kusto)\s+[^\n]*?--kernel-name\s+(\S+)/g)) {
-                    const prefix = match[1] === "mssql" ? "sql" : "kql";
-                    this._ConnectedKernels.set(prefix, `${prefix}-${match[2]}`);
-                }
-                for (const match of code.matchAll(/#!connect\s+jupyter\s+[^\n]*?--kernel-name\s+(\S+)[^\n]*?--kernel-spec\s+(\S+)/g)) {
-                    // jupyter kernels keep the given name; language inferred from the spec
-                    const language = /^python/i.test(match[2]) ? "python" : /^(ir|r)\b/i.test(match[2]) ? "r" : undefined;
-                    if (language)
-                        this._ConnectedKernels.set(language, match[1]);
-                }
-            }
+            if (result.Succeeded && targetKernel === ".NET")
+                this.RegisterConnections(code);
             execution.end(result.Succeeded, Date.now());
             this._OnDidExecute.fire();
         }
