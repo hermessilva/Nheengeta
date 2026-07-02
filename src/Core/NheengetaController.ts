@@ -4,6 +4,9 @@
 //------------------------------------------------------------------------------
 
 import * as vscode from "vscode";
+import * as os from "os";
+import * as path from "path";
+import { spawn } from "child_process";
 import { XKernelProcess } from "./KernelProcess";
 import { XKernelInstaller } from "./KernelInstaller";
 import { XSubkernelRegistry } from "./SubkernelRegistry";
@@ -83,6 +86,57 @@ export class XNheengetaController {
         }
     }
 
+    // ─── local JavaScript execution (Node) ───────────────────────────────────
+
+    /** Run a JS cell in Node — the extension host binary in node mode, so no
+     *  PATH dependency. Returns true on exit code 0. */
+    private async ExecuteJavaScript(pCode: string, pExecution: vscode.NotebookCellExecution): Promise<boolean> {
+        const directory = path.join(os.tmpdir(), "nheengeta-run");
+        await vscode.workspace.fs.createDirectory(vscode.Uri.file(directory));
+        const file = path.join(directory, "cell.js");
+        await vscode.workspace.fs.writeFile(vscode.Uri.file(file), new TextEncoder().encode(pCode));
+
+        return new Promise<boolean>((pResolve) => {
+            const proc = spawn(process.execPath, [file], {
+                cwd: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+                env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+                windowsHide: true
+            });
+            let stdout = "";
+            let stderr = "";
+            proc.stdout.setEncoding("utf8");
+            proc.stdout.on("data", (pChunk: string) => { stdout += pChunk; });
+            proc.stderr.setEncoding("utf8");
+            proc.stderr.on("data", (pChunk: string) => { stderr += pChunk; });
+            proc.on("error", (pErr) => {
+                void pExecution.appendOutput(new vscode.NotebookCellOutput([
+                    vscode.NotebookCellOutputItem.error(CleanError(pErr.message))
+                ]));
+                pResolve(false);
+            });
+            proc.on("exit", (pCodeExit) => {
+                void (async () => {
+                    if (stdout.length > 0) {
+                        await pExecution.appendOutput(new vscode.NotebookCellOutput([
+                            vscode.NotebookCellOutputItem.text(stdout, "text/plain")
+                        ]));
+                    }
+                    if (pCodeExit !== 0 && stderr.length > 0) {
+                        await pExecution.appendOutput(new vscode.NotebookCellOutput([
+                            vscode.NotebookCellOutputItem.error(CleanError(stderr.trim()))
+                        ]));
+                    }
+                    else if (stderr.length > 0) {
+                        await pExecution.appendOutput(new vscode.NotebookCellOutput([
+                            vscode.NotebookCellOutputItem.text(stderr, "text/plain")
+                        ]));
+                    }
+                    pResolve(pCodeExit === 0);
+                })();
+            });
+        });
+    }
+
     // ─── connector preload ───────────────────────────────────────────────────
 
     private readonly _LoadedConnectors = new Set<string>();
@@ -131,6 +185,17 @@ export class XNheengetaController {
                 for (const output of outputs)
                     await execution.appendOutput(output);
                 execution.end(true, Date.now());
+                return;
+            }
+
+            // JavaScript runs locally in Node (same runtime Debug Cell uses).
+            // The dotnet-interactive javascript kernel only executes in a
+            // browser client, so stdio submissions to it always fail.
+            if (languageId === "javascript") {
+                const ok = await this.ExecuteJavaScript(code, execution);
+                if (ok)
+                    this._OnDidExecute.fire();
+                execution.end(ok, Date.now());
                 return;
             }
 

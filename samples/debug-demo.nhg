@@ -9,7 +9,7 @@
 
 #!javascript
 
-// carrinho de compras — bom para step e watch
+// carrinho de compras — bom para step e watch 
 const cart = [
     { name: "Café",    price: 24.9, qty: 2 },
     { name: "Filtro",  price: 8.5,  qty: 1 },
