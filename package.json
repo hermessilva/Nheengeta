@@ -2,7 +2,7 @@
     "name": "nheengeta",
     "displayName": "Nheengetá Notebooks",
     "description": "Polyglot notebooks powered by the .NET Interactive kernel — C#, F#, T-SQL, KQL, PowerShell, JavaScript, Python, R, HTML and Mermaid, all speaking together.",
-    "version": "0.1.15",
+    "version": "0.1.16",
     "publisher": "HermesSilva",
     "license": "MIT",
     "icon": "media/icon.png",
@@ -133,33 +133,57 @@
             },
             {
                 "command": "Nheengeta.CopyCellOutput",
-                "title": "Copy Cell Output",
+                "title": "Copy Output — cell results to the clipboard",
                 "category": "Nheengetá",
-                "icon": "$(copy)"
+                "icon": {
+                    "light": "media/toolbar/copy.svg",
+                    "dark": "media/toolbar/copy.svg"
+                }
             },
             {
                 "command": "Nheengeta.SelectCellLanguage",
-                "title": "Select Cell Language",
+                "title": "Language — C#, F#, SQL, Python… (ladybug = debuggable)",
                 "category": "Nheengetá",
-                "icon": "$(globe)"
+                "icon": {
+                    "light": "media/toolbar/language.svg",
+                    "dark": "media/toolbar/language.svg"
+                }
             },
             {
                 "command": "Nheengeta.RunToHere",
-                "title": "Run All Up to This Cell",
+                "title": "Run to Here — execute every cell from the top to this one",
                 "category": "Nheengetá",
-                "icon": "$(run-above)"
+                "icon": {
+                    "light": "media/toolbar/runtohere.svg",
+                    "dark": "media/toolbar/runtohere.svg"
+                }
             },
             {
                 "command": "Nheengeta.ExportCellOutput",
-                "title": "Export Cell Output to File",
+                "title": "Export Output — save cell results as .html/.txt",
                 "category": "Nheengetá",
-                "icon": "$(save-as)"
+                "icon": {
+                    "light": "media/toolbar/export.svg",
+                    "dark": "media/toolbar/export.svg"
+                }
             },
             {
                 "command": "Nheengeta.DebugCell",
-                "title": "Debug Cell (JavaScript, Python, PowerShell)",
+                "title": "Debug Cell — breakpoints, watch, step (JavaScript, Python, PowerShell)",
                 "category": "Nheengetá",
-                "icon": "$(debug-alt)"
+                "icon": {
+                    "light": "media/toolbar/ladybug.svg",
+                    "dark": "media/toolbar/ladybug.svg"
+                }
+            },
+            {
+                "command": "Nheengeta.AddPackage",
+                "title": "Add Package — #!use from nuget/npm/pip/PSGallery/CRAN",
+                "category": "Nheengetá",
+                "icon": {
+                    "light": "media/toolbar/package.svg",
+                    "dark": "media/toolbar/package.svg"
+                }
             },
             {
                 "command": "Nheengeta.RefreshVariables",
@@ -175,9 +199,12 @@
             },
             {
                 "command": "Nheengeta.AskAi",
-                "title": "Ask AI (fix, explain, improve)",
+                "title": "Ask AI — fix the error, explain or improve this cell",
                 "category": "Nheengetá",
-                "icon": "$(sparkle)"
+                "icon": {
+                    "light": "media/toolbar/ai.svg",
+                    "dark": "media/toolbar/ai.svg"
+                }
             }
         ],
         "viewsContainers": {
@@ -222,14 +249,19 @@
                     "group": "inline@4"
                 },
                 {
-                    "command": "Nheengeta.CopyCellOutput",
+                    "command": "Nheengeta.AddPackage",
                     "when": "notebookType == nheengeta && notebookCellType == code",
                     "group": "inline@5"
                 },
                 {
-                    "command": "Nheengeta.ExportCellOutput",
+                    "command": "Nheengeta.CopyCellOutput",
                     "when": "notebookType == nheengeta && notebookCellType == code",
                     "group": "inline@6"
+                },
+                {
+                    "command": "Nheengeta.ExportCellOutput",
+                    "when": "notebookType == nheengeta && notebookCellType == code",
+                    "group": "inline@7"
                 }
             ],
             "notebook/toolbar": [

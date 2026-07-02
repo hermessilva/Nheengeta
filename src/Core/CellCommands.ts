@@ -16,6 +16,7 @@ export class XCellCommands {
             vscode.commands.registerCommand("Nheengeta.CopyCellOutput", (pCell?: vscode.NotebookCell) => this.CopyOutput(pCell)),
             vscode.commands.registerCommand("Nheengeta.SelectCellLanguage", (pCell?: vscode.NotebookCell) => this.SelectLanguage(pCell)),
             vscode.commands.registerCommand("Nheengeta.RunToHere", (pCell?: vscode.NotebookCell) => this.RunToHere(pCell)),
+            vscode.commands.registerCommand("Nheengeta.AddPackage", (pCell?: vscode.NotebookCell) => this.AddPackage(pCell)),
             vscode.commands.registerCommand("Nheengeta.ExportCellOutput", (pCell?: vscode.NotebookCell) => this.ExportOutput(pCell)));
     }
 
@@ -84,6 +85,43 @@ export class XCellCommands {
             ranges: [{ start: 0, end: cell.index + 1 }],
             document: cell.notebook.uri
         });
+    }
+
+    // ─── Add package (#!use) ─────────────────────────────────────────────────
+
+    private static readonly _PackageSources: Record<string, string> = {
+        csharp: "nuget.org",
+        fsharp: "nuget.org",
+        javascript: "npm",
+        python: "PyPI (pip)",
+        powershell: "PowerShell Gallery",
+        r: "CRAN"
+    };
+
+    private static async AddPackage(pCell?: vscode.NotebookCell): Promise<void> {
+        const cell = this.TargetCell(pCell);
+        if (!cell)
+            return;
+        const language = cell.document.languageId;
+        const source = this._PackageSources[language];
+        if (!source) {
+            void vscode.window.showInformationMessage(
+                `Nheengetá: ${language} cells need no packages (batteries included).`);
+            return;
+        }
+        const packages = await vscode.window.showInputBox({
+            title: `Nheengetá — add package from ${source}`,
+            prompt: `Package name(s), space separated — inserted as #!use at the top of the cell`,
+            placeHolder: language === "javascript" ? "e.g. lodash axios" : "e.g. Newtonsoft.Json",
+            validateInput: (pValue) =>
+                /^[A-Za-z0-9@/._^~\s,-]*$/.test(pValue) ? undefined : "Invalid character in package name"
+        });
+        if (!packages || packages.trim().length === 0)
+            return;
+
+        const edit = new vscode.WorkspaceEdit();
+        edit.insert(cell.document.uri, new vscode.Position(0, 0), `#!use ${packages.trim()}\n`);
+        await vscode.workspace.applyEdit(edit);
     }
 
     // ─── Copy / export output ────────────────────────────────────────────────
