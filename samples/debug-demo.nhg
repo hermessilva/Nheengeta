@@ -1,0 +1,49 @@
+#!markdown
+
+# Debug demo — JavaScript
+
+1. Marque um breakpoint no gutter (bolinha vermelha) — sugestão: linha do `total += price` ou dentro do `fibonacci`.
+2. Clique no 🐞 **Debug Cell** na barrinha da célula.
+3. Use F10 (step over), F11 (step into), painel **Variables**, **Watch** e hover nas variáveis.
+4. Sem breakpoint, o debugger para na primeira linha.
+
+#!javascript
+
+// carrinho de compras — bom para step e watch
+const cart = [
+    { name: "Café",    price: 24.9, qty: 2 },
+    { name: "Filtro",  price: 8.5,  qty: 1 },
+    { name: "Caneca",  price: 39.0, qty: 3 },
+    { name: "Colher",  price: 4.75, qty: 4 }
+];
+
+let total = 0;
+for (const item of cart) {
+    const price = item.price * item.qty;   // breakpoint aqui
+    total += price;
+    console.log(`${item.name.padEnd(8)} x${item.qty} = R$ ${price.toFixed(2)}`);
+}
+
+// desconto progressivo — bom para breakpoint condicional (ex.: `level === 2`)
+function discount(value, level) {
+    if (level <= 0)
+        return value;
+    const reduced = value * 0.95;          // 5% por nível
+    return discount(reduced, level - 1);
+}
+
+const final = discount(total, 3);
+console.log(`Total:    R$ ${total.toFixed(2)}`);
+console.log(`Com desc: R$ ${final.toFixed(2)}`);
+
+// fibonacci recursivo — bom para step into e call stack
+function fibonacci(n) {
+    if (n <= 1)
+        return n;
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+const fib = [];
+for (let i = 0; i < 10; i++)
+    fib.push(fibonacci(i));
+console.log("Fibonacci:", fib.join(", "));
